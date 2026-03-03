@@ -1,134 +1,126 @@
 <!DOCTYPE html>
 <html lang="en-us">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-	<link rel="stylesheet" href="25011401/theme/game.css">
-	<meta name="robots" content="noindex, nofollow">
-	<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500&display=swap" rel="stylesheet">
-	<title>Escape Road</title>
-	
-	<style type="text/css">
-		.jss1:before {
-			top: 0;
-			width: 100%;
-			filter: blur(16px);
-			height: 100%;
-			content: "";
-			display: block;
-			opacity: .5;
-			z-index: 0;
-			position: absolute;
-			background-size: cover;
-			background-image: url("25011401/loading.png")
-		}
-	</style> 
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="25011401/theme/game.css">
+    <meta name="robots" content="noindex, nofollow">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500&display=swap" rel="stylesheet">
+    <title>Escape Road - Rehosted</title>
+    
+    <style type="text/css">
+        .jss1:before {
+            top: 0; width: 100%; height: 100%; content: ""; display: block;
+            filter: blur(16px); opacity: .5; z-index: 0; position: absolute;
+            background-size: cover; background-image: url("25011401/loading.png");
+        }
+    </style> 
 
-	<!-- ANTI-REDIRECT SHIELD START -->
-	<script>
-		// 1. Prevent "Frame Busting" (Allows the game to be put in an iframe on other sites)
-		Object.defineProperty(window, 'top', { value: window.self, writable: false });
-		
-		// 2. Block script-based redirects
-		window.onbeforeunload = function() { return false; };
-		
-		// 3. Overwrite common redirect methods to do nothing
-		window.location.replace = function(url) { console.log("Blocked redirect to: " + url); };
-	</script>
-	<!-- ANTI-REDIRECT SHIELD END -->
-	 
-	<script>
-		var buildUrl = "Build";
-		var versionFolder = "25011401/";
-		buildUrl = versionFolder + buildUrl;
-		var loaderUrl = buildUrl + "/escape-road-v25011401.loader.js";
-		var config = {
-			dataUrl: buildUrl + "/escape-road-v25011401.data.unityweb",
-			frameworkUrl: buildUrl + "/escape-road-v25011401.framework.js.unityweb",
-			codeUrl: buildUrl + "/escape-road-v25011401.wasm.unityweb",
-			streamingAssetsUrl: versionFolder+"StreamingAssets",
-			companyName: "Local", // Changed from azgames
-			productName: "Escape Road",
-			productVersion: "25011401",
-			pubId: ""
-		};
-		config.gameId = "escape-road";
-		config.eventLog = false; // Disabled logging
-		config.buildAPI = "";   // Removed azgames tracking URL
-		config.enableMoreGame = "no";
-		config.enablePromotion = false;
-	</script>
-	<!-- Removed gmsoft-jssdk entirely as it usually contains the redirect logic -->
+    <!-- 1. PROTECTIVE SHIELD & MOCK SDK -->
+    <script>
+        // Prevent "Frame Busting" (Allows you to rehost in iframes)
+        Object.defineProperty(window, 'top', { value: window.self, writable: false });
+
+        // Block all redirection attempts (location.href, location.replace, etc.)
+        const blockRedirect = (url) => {
+            console.warn("Blocked a redirect attempt to: " + url);
+            return true;
+        };
+
+        window.onbeforeunload = function() { return "Redirect Blocked"; };
+
+        // Create the Mock GmSoft SDK to stop "Failed to call function" errors
+        window.GmSoft = new Proxy({}, {
+            get: function(target, prop) {
+                return function() {
+                    console.log("Mock SDK: " + prop + " called with", arguments);
+                };
+            }
+        });
+
+        // Mock Firebase to stop tracking and potential remote-kill signals
+        window.firebase = new Proxy({}, {
+            get: function(target, prop) {
+                if (prop === 'initializeApp') return () => ({ analytics: () => ({ logEvent: () => {} }) });
+                return () => {};
+            }
+        });
+    </script>
 </head>
 
 <body>
 <div id="unity-container" style="display: none;">
-	<canvas id="unity-canvas"></canvas> 
+    <canvas id="unity-canvas"></canvas> 
 </div>
+
 <div id="loadingBlock">
-	<div class="jss31 jss34 jss1">
-		<div class="spinner"></div>
-		<div class="jss31 jss34 jss48" style="flex: 1 1 0%;">
-			<div class="jss32">
-				<div class="jss7 jss9 jss20 jss3">
-					<div class="jss125">
-						<div class="jss123">
-						 <img src="25011401/logo.png">
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<div class="jss31 jss34" style="flex: 3 1 0%;">
-			<div class="jss32">
-				<div class="jss31 jss34 jss39 jss50 gameloader">
-					<div class="jss32">
-						<div class="gameloader-game-name">Escape Road</div>
-					</div>
-					<div class="jss32">
-						<div class="jss32 gameloader-logo">
-							<img id="game-logo" src="25011401/loading.png">
-						</div>
-					</div>
-					<div class="jss32">
-						<div>
-							<div class="gameloader-progressbar">
-								<div class="gameloader-progressbar-progress" id="progress_fill" style="width: 0%;"></div>
-							</div>
-							<div class="gameloader-progress-info">Game Loading...</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+    <div class="jss31 jss34 jss1">
+        <div style="position: absolute; bottom: 10px; right: 10px; font-size: 18px; color: #ffffff; opacity: 0.5;">v25011401</div>
+        <div class="spinner"></div>
+        <div class="jss31 jss34 jss48" style="flex: 1 1 0%;">
+            <div class="jss32"><div class="jss7 jss9 jss20 jss3"><div class="jss125"><div class="jss123">
+                <img src="25011401/logo.png">
+            </div></div></div></div>
+        </div>
+        <div class="jss31 jss34" style="flex: 3 1 0%;">
+            <div class="jss32">
+                <div class="jss31 jss34 jss39 jss50 gameloader">
+                    <div class="gameloader-game-name">Escape Road</div>
+                    <div class="jss32 gameloader-logo"><img id="game-logo" src="25011401/loading.png"></div>
+                    <div>
+                        <div class="gameloader-progressbar">
+                            <div class="gameloader-progressbar-progress" id="progress_fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="gameloader-progress-info">Initializing...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-	<script> 
-		var progressElement = document.getElementById('progress_fill');
-		var container =	document.getElementById("unity-container");
-		var canvas =	document.getElementById("unity-canvas");
-		var loadingBar = document.querySelector("#loadingBlock");
-		var progress_text = document.querySelector(".gameloader-progress-info");
-		
-		var script = document.createElement("script");
-		script.src = loaderUrl;
-		script.onload = () => {
-			createUnityInstance(canvas, config, (progress) => {
-				progressElement.style.width = 100 * progress + "%";
-				progress_text.innerText = "Loading: " + Math.round(progress*100) + "%";
-			}).then((unityInstance) => {
-				window.unityInstance = unityInstance;
-				setTimeout(function() {
-					loadingBar.style.display = "none";
-					window.focus();
-				}, 1000);
-				container.style.display = "block";
-			}).catch((message) => {
-				console.error(message);
-			});
-		};
-		document.body.appendChild(script);
-	</script>
-	<!-- Firebase/Analytics removed to prevent tracking of host domains -->
-</body>	
+
+<script>
+    // Unity Configuration
+    var buildUrl = "Build";
+    var versionFolder = "25011401/";
+    buildUrl = versionFolder + buildUrl;
+    
+    var loaderUrl = buildUrl + "/escape-road-v25011401.loader.js";
+    var config = {
+        dataUrl: buildUrl + "/escape-road-v25011401.data.unityweb",
+        frameworkUrl: buildUrl + "/escape-road-v25011401.framework.js.unityweb",
+        codeUrl: buildUrl + "/escape-road-v25011401.wasm.unityweb",
+        streamingAssetsUrl: versionFolder + "StreamingAssets",
+        companyName: "Rehosted",
+        productName: "Escape Road",
+        productVersion: "25011401",
+        devicePixelRatio: 1, // Standardizes performance across hosts
+        eventLog: false,      // Disables original tracking
+        buildAPI: ""         // Disables original phone-home server
+    };
+
+    var progressElement = document.getElementById('progress_fill');
+    var progressText = document.querySelector(".gameloader-progress-info");
+    var loadingBar = document.querySelector("#loadingBlock");
+    var container = document.getElementById("unity-container");
+    var canvas = document.getElementById("unity-canvas");
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+            progressElement.style.width = 100 * progress + "%";
+            progressText.innerText = "Downloading: " + Math.round(progress * 100) + "%";
+        }).then((unityInstance) => {
+            window.unityInstance = unityInstance;
+            setTimeout(() => {
+                loadingBar.style.display = "none";
+                container.style.display = "block";
+                window.focus();
+            }, 1000);
+        }).catch((err) => { console.error("Unity Load Error:", err); });
+    };
+    document.body.appendChild(script);
+</script>
+</body>
 </html>
