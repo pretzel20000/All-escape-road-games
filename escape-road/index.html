@@ -9,50 +9,52 @@
         body { margin: 0; overflow: hidden; background: #000; }
         #unity-container { width: 100%; height: 100%; position: absolute; background: #000; }
         #unity-canvas { width: 100%; height: 100%; }
-        /* Click to Play Overlay */
-        #overlay {
+        #loading-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 999; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #000; z-index: 999; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
             cursor: pointer; color: white; font-family: sans-serif;
         }
-        .play-button {
-            padding: 15px 30px; font-size: 24px; background: #ff4400; color: white;
-            border: none; border-radius: 50px; font-weight: bold; cursor: pointer;
+        .play-btn {
+            padding: 15px 35px; font-size: 22px; background: #ff4400; 
+            color: white; border: none; border-radius: 50px; cursor: pointer;
         }
     </style>
 
     <script>
-        // 1. SHIELD AGAINST REDIRECTS
-        window.onbeforeunload = function() { return false; };
-        // Overwrite location methods so the game can't force a redirect
-        const noop = () => { console.log("Redirect blocked."); };
-        Object.defineProperty(window.location, 'replace', { value: noop });
-        Object.defineProperty(window.location, 'assign', { value: noop });
-
-        // 2. BULLETPROOF MOCK SDK
-        // This satisfies the "SetParam" and "GmSoft" errors in your console
+        // 1. FIXED MOCK SDK (Matches Unity's expectations exactly)
         window.GmSoft = {
             Init: function() { return Promise.resolve(); },
-            SetParam: function(a) { 
-                console.log("SDK: SetParam received:", a); 
-                return true; 
+            // Changed to accept no parameters to fix the "requires 1" error
+            SetParam: function() { 
+                console.log("SDK: SetParam called (No args)"); 
+                return "true"; 
             },
-            ShowAd: function(type, callback) {
-                console.log("SDK: Ad requested - skipping");
-                if (callback) callback();
-                else if (typeof type === 'function') type();
+            ShowAd: function(callback) {
+                console.log("SDK: Ad skipped");
+                if (typeof callback === 'function') callback();
             },
-            LogEvent: function(ev) { console.log("SDK: Event logged:", ev); },
-            GetParam: function() { return "default"; }
+            LogEvent: function() { },
+            // Some versions require this to return "true" or "1" to proceed
+            GetParam: function() { return "true"; }
         };
 
-        // 3. FAKE FIREBASE (Stops analytics crashes)
+        // 2. FAKE FIREBASE (Stops analytics crashes)
         window.firebase = {
             initializeApp: function() { 
                 return { analytics: () => ({ logEvent: () => {} }), firestore: () => {}, auth: () => {} }; 
             }
         };
+
+        // 3. SILENT REDIRECT BLOCKER (Non-crashing version)
+        // We use a simple interval to catch and stop redirects instead of freezing the property
+        let initialPath = window.location.href;
+        setInterval(() => {
+            if (window.location.href !== initialPath && !window.location.href.includes(window.location.hostname)) {
+                window.stop(); 
+                window.location.href = initialPath;
+            }
+        }, 500);
     </script>
 </head>
 
@@ -61,52 +63,50 @@
         <canvas id="unity-canvas"></canvas>
     </div>
 
-    <!-- Overlay to fix AudioContext and ensure the game starts -->
-    <div id="overlay" onclick="startGame()">
+    <div id="loading-overlay" onclick="startLoading()">
         <img src="25011401/logo.png" style="width: 200px; margin-bottom: 20px;">
-        <button class="play-button">CLICK TO PLAY</button>
-        <p>Loading may take a moment...</p>
+        <div id="status-text" style="margin-bottom: 20px;">Click to Start Game</div>
+        <button class="play-btn" id="load-btn">PLAY NOW</button>
     </div>
 
     <script>
-        var versionFolder = "25011401/";
-        var buildUrl = versionFolder + "Build";
-        var loaderUrl = buildUrl + "/escape-road-v25011401.loader.js";
+        const buildFolder = "25011401/Build";
+        const loaderUrl = buildFolder + "/escape-road-v25011401.loader.js";
 
-        var config = {
-            dataUrl: buildUrl + "/escape-road-v25011401.data.unityweb",
-            frameworkUrl: buildUrl + "/escape-road-v25011401.framework.js.unityweb",
-            codeUrl: buildUrl + "/escape-road-v25011401.wasm.unityweb",
-            streamingAssetsUrl: versionFolder + "StreamingAssets",
-            companyName: "LocalHost",
+        const config = {
+            dataUrl: buildFolder + "/escape-road-v25011401.data.unityweb",
+            frameworkUrl: buildFolder + "/escape-road-v25011401.framework.js.unityweb",
+            codeUrl: buildFolder + "/escape-road-v25011401.wasm.unityweb",
+            streamingAssetsUrl: "25011401/StreamingAssets",
+            companyName: "DefaultCompany",
             productName: "Escape Road",
             productVersion: "25011401",
-            // Security bypasses
             eventLog: false,
             buildAPI: ""
         };
 
-        var canvas = document.querySelector("#unity-canvas");
-        var overlay = document.querySelector("#overlay");
+        function startLoading() {
+            const btn = document.getElementById("load-btn");
+            const status = document.getElementById("status-text");
+            
+            btn.style.display = "none";
+            status.innerText = "Loading Assets... (0%)";
 
-        function startGame() {
-            overlay.style.display = "none";
-            // Check if AudioContext needs resuming
+            // Fix Sound for Chrome
             if (window.AudioContext || window.webkitAudioContext) {
-                var context = new (window.AudioContext || window.webkitAudioContext)();
-                context.resume();
+                (new (window.AudioContext || window.webkitAudioContext)()).resume();
             }
 
-            var script = document.createElement("script");
+            const script = document.createElement("script");
             script.src = loaderUrl;
             script.onload = () => {
-                createUnityInstance(canvas, config, (progress) => {
-                    // You can add a progress bar here if you like
+                createUnityInstance(document.querySelector("#unity-canvas"), config, (progress) => {
+                    status.innerText = "Loading Assets... (" + Math.round(100 * progress) + "%)";
                 }).then((unityInstance) => {
+                    document.getElementById("loading-overlay").style.display = "none";
                     window.unityInstance = unityInstance;
-                    console.log("Game Loaded Successfully");
-                }).catch((message) => {
-                    console.error("Unity Load Error:", message);
+                }).catch((err) => {
+                    alert("Unity Load Error: " + err);
                 });
             };
             document.body.appendChild(script);
