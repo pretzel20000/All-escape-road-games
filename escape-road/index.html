@@ -6,9 +6,9 @@
     <link rel="stylesheet" href="25011401/theme/game.css">
     <title>Escape Road</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
+        body { margin: 0; overflow: hidden; background: #000; height: 100vh; width: 100vw; }
         #unity-container { width: 100%; height: 100%; position: absolute; background: #000; }
-        #unity-canvas { width: 100%; height: 100%; }
+        #unity-canvas { width: 100% !important; height: 100% !important; }
         #loading-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 999; display: flex;
@@ -19,54 +19,66 @@
             padding: 15px 35px; font-size: 22px; background: #ff4400; 
             color: white; border: none; border-radius: 50px; cursor: pointer;
         }
+        /* Hidden dummy elements to stop "addEventListener" errors */
+        #banner-container, #more-games-btn, #ads-container { display: none; visibility: hidden; }
     </style>
 
     <script>
-        // 1. FIXED MOCK SDK (Matches Unity's expectations exactly)
+        // 1. INVINCIBLE MOCK SDK
+        // We use "arguments" based functions so they accept 0, 1, or 100 parameters without crashing.
         window.GmSoft = {
             Init: function() { return Promise.resolve(); },
-            // Changed to accept no parameters to fix the "requires 1" error
             SetParam: function() { 
-                console.log("SDK: SetParam called (No args)"); 
+                console.log("SDK: SetParam triggered"); 
                 return "true"; 
             },
-            ShowAd: function(callback) {
-                console.log("SDK: Ad skipped");
-                if (typeof callback === 'function') callback();
+            GetParam: function() { return "true"; },
+            ShowAd: function(cb) { 
+                console.log("SDK: Ad skipped"); 
+                if (typeof cb === 'function') cb(); 
+                if (arguments[1] && typeof arguments[1] === 'function') arguments[1]();
             },
             LogEvent: function() { },
-            // Some versions require this to return "true" or "1" to proceed
-            GetParam: function() { return "true"; }
+            PauseGame: function() { },
+            ResumeGame: function() { }
         };
 
-        // 2. FAKE FIREBASE (Stops analytics crashes)
+        // 2. FAKE FIREBASE
         window.firebase = {
             initializeApp: function() { 
                 return { analytics: () => ({ logEvent: () => {} }), firestore: () => {}, auth: () => {} }; 
             }
         };
 
-        // 3. SILENT REDIRECT BLOCKER (Non-crashing version)
-        // We use a simple interval to catch and stop redirects instead of freezing the property
-        let initialPath = window.location.href;
+        // 3. ANTI-REDIRECT SYSTEM
+        // Instead of redefining 'replace' (which caused a crash), we just watch the URL.
+        const originUrl = window.location.href;
+        window.onbeforeunload = null; // Kill the "Changes not saved" popup
+        
         setInterval(() => {
-            if (window.location.href !== initialPath && !window.location.href.includes(window.location.hostname)) {
-                window.stop(); 
-                window.location.href = initialPath;
+            if (window.location.href !== originUrl && !window.location.href.includes(window.location.hostname)) {
+                console.warn("Redirect blocked.");
+                window.stop();
+                window.location.href = originUrl;
             }
-        }, 500);
+        }, 100);
     </script>
 </head>
 
 <body>
+    <!-- Dummy elements to satisfy obfuscated scripts -->
+    <div id="banner-container"></div>
+    <div id="ads-container"></div>
+    <div id="more-games-btn"></div>
+
     <div id="unity-container">
         <canvas id="unity-canvas"></canvas>
     </div>
 
     <div id="loading-overlay" onclick="startLoading()">
         <img src="25011401/logo.png" style="width: 200px; margin-bottom: 20px;">
-        <div id="status-text" style="margin-bottom: 20px;">Click to Start Game</div>
-        <button class="play-btn" id="load-btn">PLAY NOW</button>
+        <div id="status-text" style="margin-bottom: 20px;">Click to Play</div>
+        <button class="play-btn" id="load-btn">START</button>
     </div>
 
     <script>
@@ -81,6 +93,7 @@
             companyName: "DefaultCompany",
             productName: "Escape Road",
             productVersion: "25011401",
+            devicePixelRatio: 1,
             eventLog: false,
             buildAPI: ""
         };
@@ -88,25 +101,24 @@
         function startLoading() {
             const btn = document.getElementById("load-btn");
             const status = document.getElementById("status-text");
-            
             btn.style.display = "none";
-            status.innerText = "Loading Assets... (0%)";
+            status.innerText = "Connecting...";
 
-            // Fix Sound for Chrome
-            if (window.AudioContext || window.webkitAudioContext) {
-                (new (window.AudioContext || window.webkitAudioContext)()).resume();
-            }
+            // Resume Audio Context
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) { const ctx = new AudioContext(); ctx.resume(); }
 
             const script = document.createElement("script");
             script.src = loaderUrl;
             script.onload = () => {
                 createUnityInstance(document.querySelector("#unity-canvas"), config, (progress) => {
-                    status.innerText = "Loading Assets... (" + Math.round(100 * progress) + "%)";
+                    status.innerText = "Loading: " + Math.round(100 * progress) + "%";
                 }).then((unityInstance) => {
                     document.getElementById("loading-overlay").style.display = "none";
                     window.unityInstance = unityInstance;
+                    console.log("Ready.");
                 }).catch((err) => {
-                    alert("Unity Load Error: " + err);
+                    console.error("Unity Error", err);
                 });
             };
             document.body.appendChild(script);
