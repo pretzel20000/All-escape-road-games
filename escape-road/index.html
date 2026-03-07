@@ -7,68 +7,74 @@
     <title>Escape Road</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; height: 100vh; width: 100vw; }
-        #unity-container { width: 100%; height: 100%; position: absolute; background: #000; }
-        #unity-canvas { width: 100% !important; height: 100% !important; }
+        #unity-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
+        #unity-canvas { width: 100% !important; height: 100% !important; background: #000; }
+        
         #loading-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 999; display: flex;
             flex-direction: column; align-items: center; justify-content: center;
-            cursor: pointer; color: white; font-family: sans-serif;
+            color: white; font-family: 'Fredoka', sans-serif; cursor: pointer;
         }
         .play-btn {
-            padding: 15px 35px; font-size: 22px; background: #ff4400; 
+            padding: 18px 45px; font-size: 26px; background: #ff4400; 
             color: white; border: none; border-radius: 50px; cursor: pointer;
+            font-weight: bold; box-shadow: 0 5px 15px rgba(255,68,0,0.4);
         }
-        /* Hidden dummy elements to stop "addEventListener" errors */
-        #banner-container, #more-games-btn, #ads-container { display: none; visibility: hidden; }
+        /* Hidden elements to stop "addEventListener" crashes */
+        #ads-container, #banner-container, #more-games-btn { display: none !important; }
     </style>
 
     <script>
-        // 1. INVINCIBLE MOCK SDK
-        // We use "arguments" based functions so they accept 0, 1, or 100 parameters without crashing.
-        window.GmSoft = {
-            Init: function() { return Promise.resolve(); },
-            SetParam: function() { 
-                console.log("SDK: SetParam triggered"); 
-                return "true"; 
-            },
-            GetParam: function() { return "true"; },
-            ShowAd: function(cb) { 
-                console.log("SDK: Ad skipped"); 
-                if (typeof cb === 'function') cb(); 
-                if (arguments[1] && typeof arguments[1] === 'function') arguments[1]();
-            },
-            LogEvent: function() { },
-            PauseGame: function() { },
-            ResumeGame: function() { }
+        // 1. THE "UNIVERSAL MOCK" SDK
+        // This accepts any number of arguments and returns "true" to satisfy Unity
+        const mockFunc = function() { 
+            console.log("SDK Call:", arguments); 
+            return "true"; 
         };
 
-        // 2. FAKE FIREBASE
+        window.GmSoft = {
+            Init: function() { return Promise.resolve("true"); },
+            SetParam: mockFunc,
+            GetParam: function() { return "true"; },
+            ShowAd: function() {
+                // If the game passes a callback, we MUST call it or the game freezes
+                for(let i=0; i<arguments.length; i++) {
+                    if(typeof arguments[i] === 'function') arguments[i]();
+                }
+                return "true";
+            },
+            LogEvent: mockFunc,
+            OnEvent: mockFunc,
+            on: mockFunc
+        };
+
+        // 2. PREVENT REDIRECTS WITHOUT CRASHING
+        // We don't redefine the property (which causes errors), we just stop the page
+        window.onbeforeunload = function() { return null; };
+        
+        // Simple logic to keep the user on the page if a script tries to hijack it
+        let lockUrl = window.location.href;
+        setInterval(() => {
+            if (window.location.href !== lockUrl && !window.location.href.includes(window.location.hostname)) {
+                window.stop();
+                window.location.href = lockUrl;
+            }
+        }, 200);
+
+        // 3. FAKE FIREBASE
         window.firebase = {
             initializeApp: function() { 
-                return { analytics: () => ({ logEvent: () => {} }), firestore: () => {}, auth: () => {} }; 
+                return { analytics: () => ({ logEvent: () => {} }), firestore: () => ({ collection: () => ({}) }), auth: () => ({}) }; 
             }
         };
-
-        // 3. ANTI-REDIRECT SYSTEM
-        // Instead of redefining 'replace' (which caused a crash), we just watch the URL.
-        const originUrl = window.location.href;
-        window.onbeforeunload = null; // Kill the "Changes not saved" popup
-        
-        setInterval(() => {
-            if (window.location.href !== originUrl && !window.location.href.includes(window.location.hostname)) {
-                console.warn("Redirect blocked.");
-                window.stop();
-                window.location.href = originUrl;
-            }
-        }, 100);
     </script>
 </head>
 
 <body>
-    <!-- Dummy elements to satisfy obfuscated scripts -->
-    <div id="banner-container"></div>
+    <!-- Dummy elements needed by the game's obfuscated scripts -->
     <div id="ads-container"></div>
+    <div id="banner-container"></div>
     <div id="more-games-btn"></div>
 
     <div id="unity-container">
@@ -76,12 +82,13 @@
     </div>
 
     <div id="loading-overlay" onclick="startLoading()">
-        <img src="25011401/logo.png" style="width: 200px; margin-bottom: 20px;">
-        <div id="status-text" style="margin-bottom: 20px;">Click to Play</div>
-        <button class="play-btn" id="load-btn">START</button>
+        <img src="25011401/logo.png" style="width: 220px; margin-bottom: 30px;">
+        <div id="status-text" style="margin-bottom: 20px; font-size: 18px;">Ready to Play</div>
+        <button class="play-btn" id="load-btn">START GAME</button>
     </div>
 
     <script>
+        // Path configuration
         const buildFolder = "25011401/Build";
         const loaderUrl = buildFolder + "/escape-road-v25011401.loader.js";
 
@@ -90,10 +97,10 @@
             frameworkUrl: buildFolder + "/escape-road-v25011401.framework.js.unityweb",
             codeUrl: buildFolder + "/escape-road-v25011401.wasm.unityweb",
             streamingAssetsUrl: "25011401/StreamingAssets",
-            companyName: "DefaultCompany",
+            companyName: "Unity",
             productName: "Escape Road",
             productVersion: "25011401",
-            devicePixelRatio: 1,
+            // Disable tracking
             eventLog: false,
             buildAPI: ""
         };
@@ -102,23 +109,26 @@
             const btn = document.getElementById("load-btn");
             const status = document.getElementById("status-text");
             btn.style.display = "none";
-            status.innerText = "Connecting...";
+            status.innerText = "Initializing... (0%)";
 
-            // Resume Audio Context
+            // Resume Audio for Unity
             const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) { const ctx = new AudioContext(); ctx.resume(); }
+            if (AudioContext) { (new AudioContext()).resume(); }
 
+            // Load the Unity Loader
             const script = document.createElement("script");
             script.src = loaderUrl;
             script.onload = () => {
                 createUnityInstance(document.querySelector("#unity-canvas"), config, (progress) => {
-                    status.innerText = "Loading: " + Math.round(100 * progress) + "%";
+                    status.innerText = "Loading Assets: " + Math.round(100 * progress) + "%";
                 }).then((unityInstance) => {
                     document.getElementById("loading-overlay").style.display = "none";
                     window.unityInstance = unityInstance;
-                    console.log("Ready.");
+                    // Ensure the canvas gets focus
+                    document.querySelector("#unity-canvas").focus();
                 }).catch((err) => {
-                    console.error("Unity Error", err);
+                    status.innerText = "Error loading game. Check console.";
+                    console.error(err);
                 });
             };
             document.body.appendChild(script);
